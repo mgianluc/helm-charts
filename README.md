@@ -123,6 +123,16 @@ sveltosApplierManager:
   readAllResources: false
 ```
 
+> **Only set `readAllResources: false` if your Ciroos organization has the `restricted_rbac: true` policy.**
+> The policy is what makes Ciroos deploy the matching restricted manifests to your cluster. Without it,
+> `sveltos-applier-manager` starts with limited permissions while `beacon` is still deployed with cluster-wide
+> `get/list/watch` on `*/*`. Kubernetes' RBAC self-escalation check then rejects the applier's attempt to grant beacon
+> permissions it doesn't hold, and the beacon deployment fails.
+
+When the organization has `restricted_rbac: true`:
+- `beacon` gets a curated, Secret-free set of read permissions (`get/list/watch`), and no `create`/`delete` on `pods`. The applier doesn't hold those verbs in this mode either.
+- `source-repository-watcher-controller` is **not deployed**. It needs cluster-wide access to Secrets (plus Argo CD and Flux source resources), which can't be granted under restricted RBAC.
+
 This curates `sveltos-applier-manager-read-permission` down to a fixed list of resources that excludes Secrets (see `ciroos.sveltosApplierReadRules` in `charts/ciroos/templates/_helpers.tpl`). `sveltos-applier-manager` is also the actor that installs `beacon`'s own RBAC on the managed cluster, so Kubernetes' RBAC self-escalation check requires it to hold at least whatever it grants beacon — if you also set `beacon.readAllResources: false` in your `ciroos-agents` values, keep this curated list a superset of beacon's.
 
 ##### Example: granting extra cluster-wide RBAC
